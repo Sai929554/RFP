@@ -1,0 +1,7 @@
+client.json
+token.json
+token_read.json
+token_send.json
+*.log
+__pycache__/
+*.env

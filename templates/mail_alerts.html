@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>RFP Management System</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100">
+    <nav class="bg-white shadow p-4">
+        <div class="container mx-auto flex justify-between items-center">
+            <a href="{{ url_for('dashboard') }}" class="text-lg font-bold">RFP Management System</a>
+            <div>
+                <a href="{{ url_for('dashboard') }}" class="text-blue-600 hover:underline mx-2">Dashboard</a>
+                {% if user.is_admin %}
+                    <a href="{{ url_for('user_management') }}" class="text-blue-600 hover:underline mx-2">Manage Users</a>
+                {% endif %}
+                <a href="{{ url_for('mail_alerts') }}" class="text-blue-600 hover:underline mx-2">Alerts</a>
+                <a href="{{ url_for('mail_automation') }}" class="text-blue-600 hover:underline mx-2">Mail Automation</a>
+                <a href="{{ url_for('logout') }}" class="text-blue-600 hover:underline mx-2">Logout</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mx-auto p-4">
+        {% if message %}
+            <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative mb-4" role="alert">
+                <span class="block sm:inline">{{ message }}</span>
+            </div>
+        {% endif %}
+        {% if error %}
+            <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
+                <span class="block sm:inline">{{ error }}</span>
+            </div>
+        {% endif %}
+
+        <div class="bg-white shadow rounded-lg p-6 mb-6">
+            <h2 class="text-xl font-semibold mb-4">Add New Alert</h2>
+            <form method="POST">
+                <div class="mb-4">
+                    <label for="recipient" class="block text-gray-700">Recipient Email</label>
+                    <input type="email" name="recipient" id="recipient" class="border rounded w-full py-2 px-3" required>
+                </div>
+                <div class="mb-4">
+                    <label for="alert_time" class="block text-gray-700">Alert Time (HH:MM)</label>
+                    <input type="text" name="alert_time" id="alert_time" placeholder="e.g., 14:30" class="border rounded w-full py-2 px-3" required>
+                </div>
+                <div class="mb-4">
+                    <label for="timezone" class="block text-gray-700">Timezone</label>
+                    <select name="timezone" id="timezone" class="border rounded w-full py-2 px-3">
+                        {% for tz in timezones %}
+                            <option value="{{ tz }}">{{ tz }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="mb-4">
+                    <label for="filter_option" class="block text-gray-700">Filter Option</label>
+                    <select name="filter_option" id="filter_option" class="border rounded w-full py-2 px-3">
+                        <option value="Due Today">Due Today</option>
+                        <option value="Due Within 3 Days" selected>Due Within 3 Days</option>
+                        <option value="Due This Week">Due This Week</option>
+                        <option value="All RFPs">All RFPs</option>
+                    </select>
+                </div>
+                <div class="mb-4">
+                    <button type="submit" name="send_now" value="send_now" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Add & Send Now</button>
+                    <button type="submit" class="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600">Add</button>
+                </div>
+            </form>
+        </div>
+
+        <div class="bg-white shadow rounded-lg p-6">
+            <h2 class="text-xl font-semibold mb-4">Existing Alerts</h2>
+            <table class="w-full table-auto">
+                <thead>
+                    <tr class="bg-gray-200">
+                        <th class="px-4 py-2">ID</th>
+                        <th class="px-4 py-2">Recipient</th>
+                        <th class="px-4 py-2">Alert Time</th>
+                        <th class="px-4 py-2">Timezone</th>
+                        <th class="px-4 py-2">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for alert_id, recipient, alert_time, timezone in alerts %}
+                        <tr>
+                            <td class="border px-4 py-2">{{ alert_id }}</td>
+                            <td class="border px-4 py-2">{{ recipient }}</td>
+                            <td class="border px-4 py-2">{{ alert_time }}</td>
+                            <td class="border px-4 py-2">{{ timezone }}</td>
+                            <td class="border px-4 py-2">
+                                <form method="POST" action="{{ url_for('delete_alert', alert_id=alert_id) }}" style="display:inline;">
+                                    <button type="submit" class="text-red-600 hover:underline">Delete</button>
+                                </form>
+                                <form method="POST" style="display:inline;">
+                                    <input type="hidden" name="action" value="edit">
+                                    <input type="hidden" name="alert_id" value="{{ alert_id }}">
+                                    <input type="text" name="new_time" placeholder="New time (HH:MM)" class="border rounded px-2 py-1 mr-2" required>
+                                    <input type="checkbox" name="send_now_edit" id="send_now_edit_{{ alert_id }}" class="mr-2">
+                                    <label for="send_now_edit_{{ alert_id }}" class="text-gray-700">Send Now</label>
+                                    <input type="hidden" name="filter_option" value="Due Within 3 Days">
+                                    <button type="submit" class="text-blue-600 hover:underline">Update Time</button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="text-right text-gray-600 mt-4">
+            Last updated: {{ current_datetime.strftime('%m/%d/%Y, %I:%M:%S %p') }} IST
+        </div>
+    </div>
+</body>
+</html>

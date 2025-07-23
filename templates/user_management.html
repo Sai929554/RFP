@@ -1,0 +1,113 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Management | Welcome, {{ user.username }}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .table-row { transition: background-color 0.2s; }
+        .table-row:hover { background-color: #e5e7eb; }
+        .fade-in { animation: fadeIn 0.5s; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <nav class="bg-blue-600 text-white p-4 shadow-md">
+        <div class="container mx-auto flex justify-between items-center">
+            <h1 class="text-xl font-bold">RFP Management System</h1>
+            <div class="space-x-4">
+                <a href="{{ url_for('dashboard') }}" class="hover:underline">Dashboard</a>
+                <a href="{{ url_for('user_management') }}" class="hover:underline">Manage Users</a>
+                <a href="{{ url_for('mail_alerts') }}" class="hover:underline">Alerts</a>
+                <a href="{{ url_for('mail_automation') }}" class="hover:underline">Mail Automation</a>
+                <a href="{{ url_for('logout') }}" class="hover:underline">Logout</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mx-auto p-6">
+        {% if message %}
+            <div class="bg-green-100 text-green-700 p-4 rounded-md mb-6 fade-in">
+                {{ message }}
+            </div>
+        {% endif %}
+        {% if error %}
+            <div class="bg-red-100 text-red-700 p-4 rounded-md mb-6 fade-in">
+                {{ error }}
+            </div>
+        {% endif %}
+
+        <div class="bg-white p-6 rounded-lg shadow-md mb-6">
+            <h2 class="text-xl font-semibold text-blue-600 mb-4">Add New User</h2>
+            <form method="POST" action="{{ url_for('user_management') }}" class="space-y-4">
+                <input type="hidden" name="action" value="add_user">
+                <div>
+                    <label for="username" class="block text-sm font-medium text-gray-700">Username</label>
+                    <input type="text" name="username" id="username" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                <div>
+                    <label for="password" class="block text-sm font-medium text-gray-700">Password</label>
+                    <input type="password" name="password" id="password" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                <div class="flex items-center">
+                    <input type="checkbox" name="is_admin" id="is_admin" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                    <label for="is_admin" class="ml-2 block text-sm text-gray-700">Admin</label>
+                </div>
+                <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">Add User</button>
+            </form>
+        </div>
+
+        {% if edit_username %}
+            <div class="bg-white p-6 rounded-lg shadow-md mb-6">
+                <h2 class="text-xl font-semibold text-blue-600 mb-4">Edit Password for {{ edit_username }}</h2>
+                <form method="POST" action="{{ url_for('user_management') }}" class="space-y-4">
+                    <input type="hidden" name="action" value="edit_password">
+                    <input type="hidden" name="username" value="{{ edit_username }}">
+                    <div>
+                        <label for="new_password" class="block text-sm font-medium text-gray-700">New Password</label>
+                        <input type="password" name="new_password" id="new_password" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    <div class="flex space-x-2">
+                        <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">Update Password</button>
+                        <a href="{{ url_for('user_management') }}" class="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        {% endif %}
+
+        <div class="bg-white rounded-lg shadow-md overflow-x-auto">
+            <h2 class="text-xl font-semibold text-blue-600 p-6">Users</h2>
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Username</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% for user_item in users %}
+                        <tr class="table-row">
+                            <td class="px-6 py-4 whitespace-nowrap">{{ user_item.username }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap">{{ 'Admin' if user_item.is_admin else 'User' }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap flex space-x-2">
+                                <form method="POST" action="{{ url_for('delete_user', username=user_item.username) }}">
+                                    <button type="submit" class="px-3 py-1 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm" title="Delete {{ user_item.username }}">Delete This User</button>
+                                </form>
+                                <a href="{{ url_for('edit_password', username=user_item.username) }}" class="px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm" title="Edit password for {{ user_item.username }}">Edit Password</a>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="mt-6 text-right text-sm text-gray-500">
+            Last updated: {{ current_datetime.strftime('%m/%d/%Y, %I:%M:%S %p') }} IST
+        </div>
+    </div>
+</body>
+</html>

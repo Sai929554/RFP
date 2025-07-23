@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body class="bg-gray-100 p-6">
+    <!-- Top Navigation Bar -->
+    <nav class="bg-gray-800 text-white p-4 flex justify-between items-center mb-6 rounded-lg">
+        <div class="text-xl font-bold">RFP Management | Welcome, {{ user.username }}</div>
+        <div class="space-x-4">
+            {% if user.is_admin %}
+                <a href="/user_management" class="hover:text-gray-300"><i class="fas fa-users"></i> Manage Users</a>
+            {% endif %}
+            <a href="/mail_alerts" class="hover:text-gray-300"><i class="fas fa-bell"></i> Alerts</a>
+            <a href="/logout" class="hover:text-gray-300"><i class="fas fa-sign-out-alt"></i> Logout</a>
+        </div>
+    </nav>
+
+    <!-- Stats Boxes -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div class="bg-white p-4 rounded-lg shadow-lg text-center">
+            <i class="fas fa-file-alt text-blue-500 text-2xl mb-2"></i>
+            <h3 class="text-lg font-semibold">Active RFPs</h3>
+            <p class="text-2xl">{{ active_rfps }}</p>
+        </div>
+        <div class="bg-white p-4 rounded-lg shadow-lg text-center">
+            <i class="fas fa-calendar-alt text-yellow-500 text-2xl mb-2"></i>
+            <h3 class="text-lg font-semibold">Due This Week</h3>
+            <p class="text-2xl">{{ due_this_week }}</p>
+        </div>
+        <div class="bg-white p-4 rounded-lg shadow-lg text-center">
+            <i class="fas fa-check-circle text-green-500 text-2xl mb-2"></i>
+            <h3 class="text-lg font-semibold">Interested</h3>
+            <p class="text-2xl">{{ interested }}</p>
+        </div>
+        <div class="bg-white p-4 rounded-lg shadow-lg text-center">
+            <i class="fas fa-chart-bar text-purple-500 text-2xl mb-2"></i>
+            <h3 class="text-lg font-semibold">Total Processed</h3>
+            <p class="text-2xl">{{ total_processed }}</p>
+        </div>
+    </div>
+
+    <!-- Search and Filter Form -->
+    <form method="GET" action="/dashboard" class="flex justify-between mb-4">
+        <input type="text" name="search" value="{{ search_query }}" placeholder="Search by subject or agency..." class="p-2 border border-gray-300 rounded-md w-1/2">
+        <div class="flex space-x-2">
+            <select name="filter" onchange="this.form.submit()" class="p-2 border border-gray-300 rounded-md">
+                <option value="All RFPs" {% if filter_option == 'All RFPs' %}selected{% endif %}>All RFPs</option>
+                <option value="Due Today" {% if filter_option == 'Due Today' %}selected{% endif %}>Due Today</option>
+                <option value="Due This Week" {% if filter_option == 'Due This Week' %}selected{% endif %}>Due This Week</option>
+                <option value="Interested" {% if filter_option == 'Interested' %}selected{% endif %}>Interested</option>
+                <option value="Not Interested" {% if filter_option == 'Not Interested' %}selected{% endif %}>Not Interested</option>
+            </select>
+            <form method="POST" action="/dashboard" style="display:inline;">
+                <button type="submit" name="refresh" value="refresh" class="bg-green-500 text-white p-2 rounded-md hover:bg-green-600"><i class="fas fa-sync"></i> Refresh</button>
+            </form>
+        </div>
+    </form>
+
+    <!-- RFP Table -->
+    <div class="overflow-x-auto">
+        <table class="min-w-full bg-white border border-gray-200">
+            <thead>
+                <tr class="bg-blue-800 text-white">
+                    <th class="py-2 px-4 border-b">Subject</th>
+                    <th class="py-2 px-4 border-b">Online Link</th>
+                    <th class="py-2 px-4 border-b">Due Date</th>
+                    <th class="py-2 px-4 border-b">Agency</th>
+                    <th class="py-2 px-4 border-b">Reference</th>
+                    <th class="py-2 px-4 border-b">Contact</th>
+                    <th class="py-2 px-4 border-b">Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for rfp in rfps %}
+                <tr>
+                    <td class="py-2 px-4 border-b">{{ rfp.display_subject }}</td>
+                    <td class="py-2 px-4 border-b"><a href="{{ rfp.online_link if rfp.online_link else '#' }}" class="text-blue-500 hover:underline">Link</a></td>
+                    <td class="py-2 px-4 border-b">{{ rfp.formatted_date if rfp.formatted_date else 'N/A' }}</td>
+                    <td class="py-2 px-4 border-b">{{ rfp.agency if rfp.agency else 'N/A' }}</td>
+                    <td class="py-2 px-4 border-b">{{ rfp.reference if rfp.reference else 'N/A' }}</td>
+                    <td class="py-2 px-4 border-b">{{ rfp.contact if rfp.contact else 'N/A' }}</td>
+                    <td class="py-2 px-4 border-b">
+                        <form method="POST" action="/dashboard" style="display:inline;">
+                            <input type="hidden" name="rfp_id" value="{{ rfp.reference }}">
+                            <select name="status" onchange="this.form.submit()" class="p-1 border border-gray-300 rounded-md">
+                                <option value="Select" {% if not rfp.status or rfp.status == 'Select' %}selected{% endif %}>Select</option>
+                                <option value="Interested" {% if rfp.status == 'Interested' %}selected{% endif %}>Interested</option>
+                                <option value="Not Interested" {% if rfp.status == 'Not Interested' %}selected{% endif %}>Not Interested</option>
+                            </select>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <p class="text-gray-600 mt-4">Last updated: {{ current_datetime.strftime('%m/%d/%Y, %I:%M:%S %p') }} IST</p>
+</body>
+</html>
+
+
+
+
+----------------------------index.html--------------------------------
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Login</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100 flex items-center justify-center h-screen">
+    <div class="bg-white p-6 rounded-lg shadow-lg w-full max-w-md">
+        <h2 class="text-2xl font-bold text-center mb-4">Login</h2>
+        {% if error %}
+            <p class="text-red-500 text-center">{{ error }}</p>
+        {% endif %}
+        <form method="POST" action="/login" class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Username:</label>
+                <input type="text" name="username" required class="mt-1 block w-full p-2 border border-gray-300 rounded-md">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Password:</label>
+                <input type="password" name="password" required class="mt-1 block w-full p-2 border border-gray-300 rounded-md">
+            </div>
+            <button type="submit" class="w-full bg-blue-500 text-white p-2 rounded-md hover:bg-blue-600">Login</button>
+        </form>
+    </div>
+</body>
+</html>
+
+
+
+-------------------------------user managemnt-----------------------------------
+<!DOCTYPE html>
+<html>
+<head>
+    <title>User Management</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100 p-6">
+    <nav class="bg-gray-800 text-white p-4 flex justify-between items-center mb-6 rounded-lg">
+        <div class="text-xl font-bold">User Management | Welcome, {{ user.username }}</div>
+        <div class="space-x-4">
+            <a href="/dashboard" class="hover:text-gray-300"><i class="fas fa-tachometer-alt"></i> Dashboard</a>
+            <a href="/mail_alerts" class="hover:text-gray-300"><i class="fas fa-bell"></i> Alerts</a>
+            <a href="/logout" class="hover:text-gray-300"><i class="fas fa-sign-out-alt"></i> Logout</a>
+        </div>
+    </nav>
+
+    {% if message %}
+        <p class="text-green-500 mb-4">{{ message }}</p>
+    {% endif %}
+    {% if error %}
+        <p class="text-red-500 mb-4">{{ error }}</p>
+    {% endif %}
+
+    <form method="POST" action="/user_management" class="mb-4">
+        <div class="flex space-x-4">
+            <input type="text" name="username" placeholder="Username" class="p-2 border border-gray-300 rounded-md" required>
+            <input type="password" name="password" placeholder="Password" class="p-2 border border-gray-300 rounded-md" required>
+            <label class="flex items-center">
+                <input type="checkbox" name="is_admin" class="mr-2"> Admin
+            </label>
+            <button type="submit" class="bg-blue-500 text-white p-2 rounded-md hover:bg-blue-600">Add User</button>
+        </div>
+    </form>
+
+    <h2 class="text-2xl font-bold mb-4">Users</h2>
+    <table class="min-w-full bg-white border border-gray-200">
+        <thead>
+            <tr class="bg-gray-200">
+                <th class="py-2 px-4 border-b">Username</th>
+                <th class="py-2 px-4 border-b">Role</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for user in users %}
+            <tr>
+                <td class="py-2 px-4 border-b">{{ user.username }}</td>
+                <td class="py-2 px-4 border-b">{{ 'Admin' if user.is_admin else 'User' }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</body>
+</html>
+
+---------------------------------mail-alerts-----------------------------------------------------
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Mail Alerts</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100 p-6">
+    <nav class="bg-gray-800 text-white p-4 flex justify-between items-center mb-6 rounded-lg">
+        <div class="text-xl font-bold">Mail Alerts | Welcome, {{ user.username }}</div>
+        <div class="space-x-4">
+            <a href="/dashboard" class="hover:text-gray-300"><i class="fas fa-tachometer-alt"></i> Dashboard</a>
+            <a href="/user_management" class="hover:text-gray-300"><i class="fas fa-users"></i> Manage Users</a>
+            <a href="/logout" class="hover:text-gray-300"><i class="fas fa-sign-out-alt"></i> Logout</a>
+        </div>
+    </nav>
+
+    {% if message %}
+        <p class="text-green-500 mb-4">{{ message }}</p>
+    {% endif %}
+    {% if error %}
+        <p class="text-red-500 mb-4">{{ error }}</p>
+    {% endif %}
+
+    <form method="POST" action="/mail_alerts" class="mb-4">
+        <div class="flex space-x-4">
+            <input type="email" name="recipient" placeholder="Recipient Email" class="p-2 border border-gray-300 rounded-md" required>
+            <input type="text" name="alert_time" placeholder="HH:MM (24-hour format)" class="p-2 border border-gray-300 rounded-md" required>
+            <select name="timezone" class="p-2 border border-gray-300 rounded-md">
+                {% for tz in timezones %}
+                    <option value="{{ tz }}" {% if tz == 'UTC' %}selected{% endif %}>{{ tz }}</option>
+                {% endfor %}
+            </select>
+            <label class="flex items-center">
+                <input type="checkbox" name="send_now" class="mr-2"> Send Now
+            </label>
+            <button type="submit" class="bg-blue-500 text-white p-2 rounded-md hover:bg-blue-600">Save</button>
+        </div>
+    </form>
+
+    <h2 class="text-2xl font-bold mb-4">Alerts</h2>
+    <table class="min-w-full bg-white border border-gray-200">
+        <thead>
+            <tr class="bg-gray-200">
+                <th class="py-2 px-4 border-b">Recipient Email</th>
+                <th class="py-2 px-4 border-b">Alert Time</th>
+                <th class="py-2 px-4 border-b">Timezone</th>
+                <th class="py-2 px-4 border-b">Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for alert_id, recipient, time, tz in alerts %}
+            <tr>
+                <td class="py-2 px-4 border-b">{{ recipient }}</td>
+                <td class="py-2 px-4 border-b">{{ time }}</td>
+                <td class="py-2 px-4 border-b">{{ tz }}</td>
+                <td class="py-2 px-4 border-b">
+                    <form method="POST" action="{{ url_for('delete_alert', alert_id=alert_id) }}">
+                        <button type="submit" class="bg-red-500 text-white px-2 py-1 rounded-md hover:bg-red-600">Delete</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</body>
+</html>
+
+=================================dashboard Automation================================
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RFP Management | Welcome, {{ user.username }}</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
+        .header { background-color: #f8f9fa; padding: 10px; text-align: center; }
+        .nav { background-color: #e9ecef; padding: 10px; }
+        .nav a { margin-right: 10px; text-decoration: none; color: #007bff; }
+        .nav a:hover { text-decoration: underline; }
+        .container { display: flex; flex-wrap: wrap; padding: 20px; }
+        .card { flex: 1; min-width: 200px; margin: 10px; padding: 15px; border: 1px solid #ddd; border-radius: 5px; background-color: #fff; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        .form-group { margin-bottom: 15px; }
+        button { padding: 8px 16px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h2>RFP Management | Welcome, {{ user.username }}</h2>
+    </div>
+    <div class="nav">
+        {% if user.is_admin %}
+            <a href="{{ url_for('user_management') }}">Manage Users</a>
+        {% endif %}
+        <a href="{{ url_for('mail_alerts') }}">Alerts</a>
+        <a href="{{ url_for('mail_automation') }}">Mail Automation</a>
+        <a href="{{ url_for('logout') }}">Logout</a>
+    </div>
+
+    <div class="container">
+        <div class="card">
+            <h3>Active RFPs</h3>
+            <p>{{ active_rfps }}</p>
+        </div>
+        <div class="card">
+            <h3>Due This Week</h3>
+            <p>{{ due_this_week }}</p>
+        </div>
+        <div class="card">
+            <h3>Interested</h3>
+            <p>{{ interested }}</p>
+        </div>
+        <div class="card">
+            <h3>Total Processed</h3>
+            <p>{{ total_processed }}</p>
+        </div>
+    </div>
+
+    <div class="container">
+        <form method="GET" action="{{ url_for('dashboard') }}">
+            <div class="form-group">
+                <select name="filter">
+                    <option value="All RFPs" {% if filter_option == 'All RFPs' %}selected{% endif %}>All RFPs</option>
+                    <option value="Due Today" {% if filter_option == 'Due Today' %}selected{% endif %}>Due Today</option>
+                    <option value="Due This Week" {% if filter_option == 'Due This Week' %}selected{% endif %}>Due This Week</option>
+                    <option value="Interested" {% if filter_option == 'Interested' %}selected{% endif %}>Interested</option>
+                    <option value="Not Interested" {% if filter_option == 'Not Interested' %}selected{% endif %}>Not Interested</option>
+                </select>
+                <button type="submit">Refresh</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="container">
+        <table>
+            <tr>
+                <th>Subject</th>
+                <th>Online Link</th>
+                <th>Due Date</th>
+                <th>Agency</th>
+                <th>Reference</th>
+                <th>Contact</th>
+                <th>Status</th>
+            </tr>
+            {% for rfp in rfps %}
+            <tr>
+                <td>{{ rfp.display_subject }}</td>
+                <td><a href="{{ rfp.online_link if rfp.online_link else '#' }}">Link</a></td>
+                <td>{{ rfp.formatted_date if rfp.formatted_date else 'N/A' }}</td>
+                <td>{{ rfp.agency if rfp.agency else 'N/A' }}</td>
+                <td>{{ rfp.reference if rfp.reference else 'N/A' }}</td>
+                <td>{{ rfp.contact if rfp.contact else 'N/A' }}</td>
+                <td>
+                    <form method="POST" action="{{ url_for('dashboard') }}">
+                        <input type="hidden" name="rfp_id" value="{{ rfp.reference }}">
+                        <select name="status">
+                            <option value="">Select</option>
+                            <option value="Interested" {% if rfp.status == 'Interested' %}selected{% endif %}>Interested</option>
+                            <option value="Not Interested" {% if rfp.status == 'Not Interested' %}selected{% endif %}>Not Interested</option>
+                        </select>
+                        <button type="submit">Update</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </table>
+    </div>
+
+    <p style="text-align: right; font-size: 12px; color: #6c757d;">
+        Last updated: {{ current_datetime.strftime('%m/%d/%Y, %I:%M:%S %p') }} IST
+    </p>
+</body>
+</html>

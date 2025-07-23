@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard | Welcome, {{ user.username }}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .table-row { transition: background-color 0.2s; }
+        .table-row:hover { background-color: #e5e7eb; }
+        .fade-in { animation: fadeIn 0.5s; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    </style>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const selectElements = document.querySelectorAll('select[name="status"]');
+            selectElements.forEach(select => {
+                select.addEventListener('change', function() {
+                    if (this.value) {
+                        this.form.submit();
+                    }
+                });
+            });
+        });
+    </script>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <nav class="bg-blue-600 text-white p-4 shadow-md">
+        <div class="container mx-auto flex justify-between items-center">
+            <h1 class="text-xl font-bold">RFP Management System</h1>
+            <div class="space-x-4">
+                <a href="{{ url_for('dashboard') }}" class="hover:underline">Dashboard</a>
+                {% if user.is_admin %}
+                    <a href="{{ url_for('user_management') }}" class="hover:underline">Manage Users</a>
+                {% endif %}
+                <a href="{{ url_for('mail_alerts') }}" class="hover:underline">Alerts</a>
+                <a href="{{ url_for('mail_automation') }}" class="hover:underline">Mail Automation</a>
+                <a href="{{ url_for('logout') }}" class="hover:underline">Logout</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mx-auto p-6">
+        {% if message %}
+            <div class="bg-green-100 text-green-700 p-4 rounded-md mb-6 fade-in">
+                {{ message }}
+            </div>
+        {% endif %}
+        {% if error %}
+            <div class="bg-red-100 text-red-700 p-4 rounded-md mb-6 fade-in">
+                {{ error }}
+            </div>
+        {% endif %}
+
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <div class="bg-white p-4 rounded-lg shadow-md text-center">
+                <h3 class="text-lg font-semibold text-blue-600">Total RFPs</h3>
+                <p class="text-2xl font-bold">{{ total }}</p>
+            </div>
+            <div class="bg-white p-4 rounded-lg shadow-md text-center">
+                <h3 class="text-lg font-semibold text-blue-600">Active RFPs</h3>
+                <p class="text-2xl font-bold">{{ active_rfps }}</p>
+            </div>
+            <div class="bg-white p-4 rounded-lg shadow-md text-center">
+                <h3 class="text-lg font-semibold text-blue-600">Due This Week</h3>
+                <p class="text-2xl font-bold">{{ due_this_week }}</p>
+            </div>
+            <div class="bg-white p-4 rounded-lg shadow-md text-center">
+                <h3 class="text-lg font-semibold text-blue-600">Interested</h3>
+                <p class="text-2xl font-bold">{{ interested }}</p>
+            </div>
+        </div>
+
+        <div class="bg-white p-6 rounded-lg shadow-md mb-6">
+            <div class="flex flex-col md:flex-row justify-between items-center mb-4">
+                <h2 class="text-xl font-semibold text-blue-600">RFP Dashboard</h2>
+                <div class="flex space-x-4 mt-4 md:mt-0">
+                    <form action="{{ url_for('dashboard') }}" method="GET" class="flex space-x-2">
+                        <select name="filter" class="border-gray-300 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500">
+                            <option value="All RFPs" {% if filter_option == 'All RFPs' %}selected{% endif %}>All RFPs</option>
+                            <option value="Due Today" {% if filter_option == 'Due Today' %}selected{% endif %}>Due Today</option>
+                            <option value="Due This Week" {% if filter_option == 'Due This Week' %}selected{% endif %}>Due This Week</option>
+                            <option value="Interested" {% if filter_option == 'Interested' %}selected{% endif %}>Interested</option>
+                            <option value="Not Interested" {% if filter_option == 'Not Interested' %}selected{% endif %}>Not Interested</option>
+                        </select>
+                        <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">Filter</button>
+                    </form>
+                    <form action="{{ url_for('dashboard') }}" method="GET" class="flex space-x-2">
+                        <input type="hidden" name="filter" value="{{ filter_option }}">
+                        <input type="text" name="search" placeholder="Search RFPs..." class="border-gray-300 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500">
+                        <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">Search</button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Subject</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Online Link</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Due Date</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Agency</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reference</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {% for rfp in rfps %}
+                            <tr class="table-row">
+                                <td class="px-6 py-4 whitespace-nowrap">{{ rfp.subject | default('N/A') }}</td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <a href="{{ rfp.online_link | default('#') }}" class="text-blue-600 hover:underline break-all" target="_blank">{{ rfp.online_link | default('N/A') }}</a>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">{{ rfp.formatted_date | default('N/A') }}</td>
+                                <td class="px-6 py-4 whitespace-nowrap">{{ rfp.agency | default('N/A') }}</td>
+                                <td class="px-6 py-4 whitespace-nowrap">{{ rfp.reference | default('N/A') }}</td>
+                                <td class="px-6 py-4 whitespace-nowrap">{{ rfp.contact | default('N/A') }}</td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <form method="POST" action="{{ url_for('dashboard') }}">
+                                        <input type="hidden" name="rfp_id" value="{{ rfp.reference }}">
+                                        <select name="status" class="border-gray-300 rounded-md p-1 focus:ring-blue-500 focus:border-blue-500">
+                                            <option value="" {% if not rfp.status %}selected{% endif %}>Select</option>
+                                            <option value="Interested" {% if rfp.status == 'Interested' %}selected{% endif %}>Interested</option>
+                                            <option value="Not Interested" {% if rfp.status == 'Not Interested' %}selected{% endif %}>Not Interested</option>
+                                        </select>
+                                    </form>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="mt-6 text-right text-sm text-gray-500">
+            Last updated: {{ current_datetime.strftime('%m/%d/%Y, %I:%M:%S %p') }} IST
+        </div>
+    </div>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'95f0f2441d3d2e8a',t:'MTc1MjQ5NTMzNS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>

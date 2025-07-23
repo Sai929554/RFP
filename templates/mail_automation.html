@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mail Automation | Welcome, {{ user.username }}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .table-row { transition: background-color 0.2s; }
+        .table-row:hover { background-color: #e5e7eb; }
+        .fade-in { animation: fadeIn 0.5s; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .log-container {
+            background-color: #1a1a1a;
+            color: #00ff00;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 600px;
+            overflow-y: auto;
+            padding: 15px;
+            border-radius: 8px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .log-entry {
+            margin-bottom: 2px;
+            line-height: 1.4;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <nav class="bg-blue-600 text-white p-4 shadow-md">
+        <div class="container mx-auto flex justify-between items-center">
+            <h1 class="text-xl font-bold">RFP Management System</h1>
+            <div class="space-x-4">
+                <a href="{{ url_for('dashboard') }}" class="hover:underline">Dashboard</a>
+                {% if user.is_admin %}
+                    <a href="{{ url_for('user_management') }}" class="hover:underline">Manage Users</a>
+                {% endif %}
+                <a href="{{ url_for('mail_alerts') }}" class="hover:underline">Alerts</a>
+                <a href="{{ url_for('mail_automation') }}" class="hover:underline">Mail Automation</a>
+                <a href="{{ url_for('logout') }}" class="hover:underline">Logout</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mx-auto p-6">
+        {% if message %}
+            <div class="bg-green-100 text-green-700 p-4 rounded-md mb-6 fade-in">
+                {{ message }}
+            </div>
+        {% endif %}
+        {% if error %}
+            <div class="bg-red-100 text-red-700 p-4 rounded-md mb-6 fade-in">
+                {{ error }}
+            </div>
+        {% endif %}
+
+        {% if show_logs %}
+            <div class="bg-white p-6 rounded-lg shadow-md mb-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-semibold text-blue-600">System Logs</h2>
+                    <form method="GET" action="{{ url_for('mail_automation') }}" class="inline">
+                        <button type="submit" class="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700">Back to Automation</button>
+                    </form>
+                </div>
+                <div class="log-container">
+                    {% if logs %}
+                        {% for log in logs %}
+                            <div class="log-entry">{{ log }}</div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="log-entry text-yellow-400">No logs available yet. Run email processing to see logs.</div>
+                    {% endif %}
+                </div>
+                <div class="mt-4 text-sm text-gray-600">
+                    <p>📝 Showing last 500 log entries</p>
+                    <p>🔄 Logs update in real-time during email processing</p>
+                </div>
+            </div>
+        {% else %}
+            <div class="bg-white p-6 rounded-lg shadow-md mb-6">
+                <h2 class="text-xl font-semibold text-blue-600 mb-4">Mail Automation Settings</h2>
+                <form method="POST" action="{{ url_for('mail_automation') }}" class="space-y-4">
+                    <input type="hidden" name="action" value="process_emails">
+                    <div>
+                        <label for="time_interval" class="block text-sm font-medium text-gray-700">Run every (minutes or hours, e.g., 30m or 2h)</label>
+                        <input type="text" name="time_interval" id="time_interval" value="{{ time_interval if time_interval else '1h' }}" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500" placeholder="e.g., 30m or 2h">
+                    </div>
+                    <div class="flex space-x-4">
+                        <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">Update Schedule</button>
+                        <button type="submit" name="action" value="run_now" class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700">Run Now</button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="bg-white p-6 rounded-lg shadow-md">
+                <h2 class="text-xl font-semibold text-blue-600 mb-4">Opportunities</h2>
+                {% if opportunities %}
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Subject</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Online Link</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Due Date</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Agency</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reference</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                {% for opportunity in opportunities %}
+                                    <tr class="table-row">
+                                        <td class="px-6 py-4 whitespace-nowrap">{{ opportunity.subject if opportunity.subject else opportunity.get('subject', 'N/A') }}</td>
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <a href="{{ opportunity.online_link if opportunity.online_link else opportunity.get('online_link', '#') }}" class="text-blue-600 hover:underline" target="_blank">{{ opportunity.online_link if opportunity.online_link else opportunity.get('online_link', 'N/A') }}</a>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap">{{ opportunity.formatted_date if opportunity.formatted_date else opportunity.get('formatted_date', 'N/A') }}</td>
+                                        <td class="px-6 py-4 whitespace-nowrap">{{ opportunity.agency if opportunity.agency else opportunity.get('agency', 'N/A') }}</td>
+                                        <td class="px-6 py-4 whitespace-nowrap">{{ opportunity.reference if opportunity.reference else opportunity.get('reference', 'N/A') }}</td>
+                                        <td class="px-6 py-4 whitespace-nowrap">{{ opportunity.contact if opportunity.contact else opportunity.get('contact', 'N/A') }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="text-gray-500">No opportunities processed yet.</p>
+                {% endif %}
+                <div class="mt-4 flex space-x-2">
+                    <form method="POST" action="{{ url_for('mail_automation') }}">
+                        <input type="hidden" name="action" value="view_processed">
+                        <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">View Processed</button>
+                    </form>
+                    <form method="POST" action="{{ url_for('mail_automation') }}">
+                        <input type="hidden" name="action" value="view_logs">
+                        <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">View Logs</button>
+                    </form>
+                </div>
+            </div>
+        {% endif %}
+
+        <div class="mt-6 text-right text-sm text-gray-500">
+            Last updated: {{ current_datetime.strftime('%m/%d/%Y, %I:%M:%S %p') }} IST
+        </div>
+    </div>
+</body>
+</html>
