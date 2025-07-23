@@ -45,24 +45,31 @@ if platform.system() == "Windows":
 else:
     import fcntl
 
-# Load environment variables with enhanced error handling
+from dotenv import load_dotenv
+import os
+import logging
+
+logger = logging.getLogger(__name__)
+
 def load_environment_files():
-    """Load environment variables from .env files and verify their presence."""
-    if not os.path.exists('supabase.env'):
-        logger.error("supabase.env file not found in the project directory.")
-        print("❌ Error: supabase.env file not found in the project directory.")
-        raise FileNotFoundError("supabase.env file not found")
-    if not os.path.exists('credentials.env'):
-        logger.error("credentials.env file not found in the project directory.")
-        print("❌ Error: credentials.env file not found in the project directory.")
-        raise FileNotFoundError("credentials.env file not found")
+    """Load environment variables from .env files if present, else rely on system environment variables."""
+    # Load .env files only if they exist (for local development)
+    if os.path.exists('supabase.env'):
+        load_dotenv('supabase.env')
+        print("✅ Loaded supabase.env")
+    else:
+        print("⚠️ supabase.env not found. Using environment variables from Render.")
 
-    load_dotenv('supabase.env')
-    load_dotenv('credentials.env')
+    if os.path.exists('credentials.env'):
+        load_dotenv('credentials.env')
+        print("✅ Loaded credentials.env")
+    else:
+        print("⚠️ credentials.env not found. Using environment variables from Render.")
 
-    # Verify critical environment variables
+    # Verify required environment variables
     required_vars = ['SUPABASE_URL', 'SUPABASE_KEY', 'GOV_USERNAME', 'GOV_PASSWORD']
     missing_vars = [var for var in required_vars if not os.environ.get(var)]
+    
     if missing_vars:
         error_msg = f"Missing environment variables: {', '.join(missing_vars)}"
         logger.error(error_msg)
@@ -1629,10 +1636,10 @@ def logout():
     session.pop('user', None)
     return redirect(url_for('index'))
     
+# Start the scheduler when the app starts
+start_scheduler()
+
 if __name__ == '__main__':
-    start_scheduler()
     print(f"🌐 Starting HTTP server for UI...")
     print(f" * Running on http://127.0.0.1:5000/ (Press CTRL+C to quit)")
-    
     app.run(debug=True)
-            
