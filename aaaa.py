@@ -195,21 +195,27 @@ def retry_on_transient_error(max_attempts=3, backoff_factor=2):
         return wrapper
     return decorator
 
+import json
+import os
+from google.auth.transport.requests import Request
+from google_auth_oauthlib.flow import InstalledAppFlow
+from google.oauth2.credentials import Credentials
+from googleapiclient.discovery import build
+
 def authenticate_google():
     """Authenticate with Google API and return Gmail service for sending emails."""
     global gmail_service
     logger.debug("Attempting to authenticate Google API for sending emails")
-    creds = None
-    token_path = 'token.json'
     
-    if os.path.exists(token_path):
+    creds = None
+    token_data = os.environ.get('TOKEN_SEND_JSON')  # Load token from env
+    
+    if token_data:
         try:
-            with open(token_path, 'r') as token:
-                creds = Credentials.from_authorized_user_file(token_path, SCOPES)
-                logger.debug("Loaded existing token for sending emails")
+            creds = Credentials.from_authorized_user_info(json.loads(token_data), SCOPES)
+            logger.debug("Loaded existing token for sending emails from environment variable")
         except Exception as e:
-            logger.error(f"Error reading token file {token_path}: {e}")
-            os.remove(token_path)
+            logger.error(f"Error reading token from env: {e}")
             creds = None
 
     if not creds or not creds.valid:
@@ -223,14 +229,15 @@ def authenticate_google():
         if not creds:
             try:
                 logger.debug("Initiating new authentication flow for sending emails")
-                flow = InstalledAppFlow.from_client_secrets_file('client.json', SCOPES)
+                flow = InstalledAppFlow.from_client_config(
+                    json.loads(os.environ['GOOGLE_CLIENT_JSON']), SCOPES
+                )
                 creds = flow.run_local_server(port=0, access_type='offline', prompt='consent')
-                with open(token_path, 'w') as token:
-                    token.write(creds.to_json())
-                logger.debug("Saved new token for sending emails")
-            except FileNotFoundError:
-                logger.error("client.json not found. Please ensure it exists in the project directory.")
-                raise FileNotFoundError("client.json not found")
+                os.environ['TOKEN_SEND_JSON'] = creds.to_json()  # Save token back to env
+                logger.debug("Saved new token for sending emails into environment variable")
+            except KeyError:
+                logger.error("GOOGLE_CLIENT_JSON not set. Please add it to environment variables.")
+                raise FileNotFoundError("GOOGLE_CLIENT_JSON environment variable not found")
             except Exception as e:
                 logger.error(f"Authentication flow failed for sending emails: {e}")
                 raise Exception(f"Authentication flow failed: {e}")
@@ -242,41 +249,41 @@ def authenticate_google():
     except Exception as e:
         logger.error(f"Failed to build Gmail service for sending emails: {e}")
         raise Exception(f"Failed to build Gmail service: {e}")
-
-def authenticate_gmail_read(scopes, token_file):
+def authenticate_gmail_read(scopes, token_env_var):
     """Authenticate with Google API for read-only access and return Gmail service."""
-    logger.debug(f"Attempting to authenticate Google API for read-only access with token file {token_file}")
-    creds = None
+    logger.debug(f"Attempting to authenticate Google API for read-only access with token env {token_env_var}")
     
-    if os.path.exists(token_file):
+    creds = None
+    token_data = os.environ.get(token_env_var)  # Load token from env
+    
+    if token_data:
         try:
-            with open(token_file, 'r') as token:
-                creds = Credentials.from_authorized_user_file(token_file, scopes)
-                logger.debug(f"Loaded existing token from {token_file}")
+            creds = Credentials.from_authorized_user_info(json.loads(token_data), scopes)
+            logger.debug(f"Loaded existing token from environment variable {token_env_var}")
         except Exception as e:
-            logger.error(f"Error reading token file {token_file}: {e}")
-            os.remove(token_file)
+            logger.error(f"Error reading token from env {token_env_var}: {e}")
             creds = None
 
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
             try:
                 creds.refresh(Request())
-                logger.debug(f"Refreshed expired token from {token_file}")
+                logger.debug(f"Refreshed expired token from {token_env_var}")
             except Exception as e:
-                logger.error(f"Failed to refresh token from {token_file}: {e}")
+                logger.error(f"Failed to refresh token from {token_env_var}: {e}")
                 creds = None
         if not creds:
             try:
-                logger.debug(f"Initiating new authentication flow for {token_file}")
-                flow = InstalledAppFlow.from_client_secrets_file('client.json', scopes)
+                logger.debug(f"Initiating new authentication flow for {token_env_var}")
+                flow = InstalledAppFlow.from_client_config(
+                    json.loads(os.environ['GOOGLE_CLIENT_JSON']), scopes
+                )
                 creds = flow.run_local_server(port=0, access_type='offline', prompt='consent')
-                with open(token_file, 'w') as token:
-                    token.write(creds.to_json())
-                logger.debug(f"Saved new token to {token_file}")
-            except FileNotFoundError:
-                logger.error("client.json not found. Please ensure it exists in the project directory.")
-                raise FileNotFoundError("client.json not found")
+                os.environ[token_env_var] = creds.to_json()  # Save token back to env
+                logger.debug(f"Saved new token to environment variable {token_env_var}")
+            except KeyError:
+                logger.error("GOOGLE_CLIENT_JSON not set. Please add it to environment variables.")
+                raise FileNotFoundError("GOOGLE_CLIENT_JSON environment variable not found")
             except Exception as e:
                 logger.error(f"Authentication flow failed for read-only access: {e}")
                 raise Exception(f"Authentication flow failed: {e}")
