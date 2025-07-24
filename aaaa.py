@@ -234,54 +234,32 @@ def authenticate_google():
         logger.error(f"❌ Failed to initialize Gmail service: {e}")
         raise Exception(f"Failed to build Gmail service: {e}")
 
-
-
 def authenticate_gmail_read(scopes, token_env_var):
     """Authenticate with Google API for read-only access and return Gmail service."""
-    logger.debug(f"Attempting to authenticate Google API for read-only access with token env {token_env_var}")
+    logger.debug(f"🔐 Authenticating Gmail read API using {token_env_var}")
     
-    creds = None
-    token_data = os.environ.get(token_env_var)  # Load token from env
-    
-    if token_data:
-        try:
-            creds = Credentials.from_authorized_user_info(json.loads(token_data), scopes)
-            logger.debug(f"Loaded existing token from environment variable {token_env_var}")
-        except Exception as e:
-            logger.error(f"Error reading token from env {token_env_var}: {e}")
-            creds = None
-
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            try:
-                creds.refresh(Request())
-                logger.debug(f"Refreshed expired token from {token_env_var}")
-            except Exception as e:
-                logger.error(f"Failed to refresh token from {token_env_var}: {e}")
-                creds = None
-        if not creds:
-            try:
-                logger.debug(f"Initiating new authentication flow for {token_env_var}")
-                flow = InstalledAppFlow.from_client_config(
-                    json.loads(os.environ['GOOGLE_CLIENT_JSON']), scopes
-                )
-                creds = flow.run_local_server(port=0, access_type='offline', prompt='consent')
-                os.environ[token_env_var] = creds.to_json()  # Save token back to env
-                logger.debug(f"Saved new token to environment variable {token_env_var}")
-            except KeyError:
-                logger.error("GOOGLE_CLIENT_JSON not set. Please add it to environment variables.")
-                raise FileNotFoundError("GOOGLE_CLIENT_JSON environment variable not found")
-            except Exception as e:
-                logger.error(f"Authentication flow failed for read-only access: {e}")
-                raise Exception(f"Authentication flow failed: {e}")
+    token_data = os.environ.get(token_env_var)
+    if not token_data:
+        logger.error(f"❌ {token_env_var} environment variable not found")
+        raise Exception(f"{token_env_var} is missing in environment")
 
     try:
+        creds = Credentials.from_authorized_user_info(json.loads(token_data), scopes)
+
+        if creds.expired and creds.refresh_token:
+            logger.info(f"🔄 Token expired. Attempting silent refresh for {token_env_var}...")
+            creds.refresh(Request())
+            logger.info("✅ Token refreshed")
+
         service = build('gmail', 'v1', credentials=creds)
-        logger.debug("Google API authentication successful for read-only access")
+        logger.debug("✅ Gmail read service initialized successfully")
         return service
+
     except Exception as e:
-        logger.error(f"Failed to build Gmail service for read-only access: {e}")
-        raise Exception(f"Failed to build Gmail service: {e}")
+        logger.error(f"❌ Failed to authenticate Gmail read: {e}")
+        raise Exception(f"Authentication failed for Gmail read: {e}")
+
+
 def get_due_rfps(filter_option):
     """Fetch RFPs based on the filter option."""
     try:
