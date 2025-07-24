@@ -198,7 +198,6 @@ def retry_on_transient_error(max_attempts=3, backoff_factor=2):
 import json
 import os
 from google.auth.transport.requests import Request
-from google_auth_oauthlib.flow import InstalledAppFlow
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 
@@ -208,30 +207,26 @@ def authenticate_google():
     logger.debug("Attempting to authenticate Google API for sending emails")
     
     creds = None
-    token_data = os.environ.get('TOKEN_SEND_JSON')  # Load token from Render environment
+    token_data = os.environ.get('TOKEN_SEND_JSON')  # Loaded from Render env
 
-    if token_data:
-        try:
-            creds = Credentials.from_authorized_user_info(json.loads(token_data), SCOPES)
-            logger.debug("✅ Loaded Gmail token from environment variable")
-        except Exception as e:
-            logger.error(f"❌ Error loading token from TOKEN_SEND_JSON: {e}")
-            raise Exception("Invalid token in TOKEN_SEND_JSON")
+    if not token_data:
+        logger.error("❌ TOKEN_SEND_JSON not set in environment.")
+        raise Exception("TOKEN_SEND_JSON is missing")
+
+    try:
+        creds = Credentials.from_authorized_user_info(json.loads(token_data), SCOPES)
+        logger.debug("✅ Loaded Gmail token from TOKEN_SEND_JSON")
 
         if creds.expired and creds.refresh_token:
-            try:
-                creds.refresh(Request())
-                logger.debug("🔁 Token refreshed successfully")
-            except Exception as e:
-                logger.error(f"❌ Failed to refresh Gmail token: {e}")
-                raise Exception("Failed to refresh Gmail token")
-    else:
-        logger.error("❌ TOKEN_SEND_JSON not found in environment.")
-        raise Exception("TOKEN_SEND_JSON not found in environment.")
+            creds.refresh(Request())
+            logger.debug("🔁 Token refreshed successfully")
+    except Exception as e:
+        logger.error(f"❌ Failed to load or refresh Gmail token: {e}")
+        raise Exception(f"Authentication failed: {e}")
 
     try:
         gmail_service = build('gmail', 'v1', credentials=creds)
-        logger.debug("✅ Gmail API authenticated and service built successfully")
+        logger.debug("✅ Gmail service built successfully")
         return gmail_service
     except Exception as e:
         logger.error(f"❌ Failed to build Gmail service: {e}")
