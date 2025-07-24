@@ -232,7 +232,7 @@ def authenticate_google():
                 flow = InstalledAppFlow.from_client_config(
                     json.loads(os.environ['GOOGLE_CLIENT_JSON']), SCOPES
                 )
-                creds = flow.run_local_server(port=0, access_type='offline', prompt='consent')
+                creds = flow.run_console()
                 os.environ['TOKEN_SEND_JSON'] = creds.to_json()  # Save token back to env
                 logger.debug("Saved new token for sending emails into environment variable")
             except KeyError:
