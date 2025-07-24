@@ -204,33 +204,36 @@ from googleapiclient.discovery import build
 def authenticate_google():
     """Authenticate with Google API and return Gmail service for sending emails."""
     global gmail_service
-    logger.debug("Attempting to authenticate Google API for sending emails")
-    
+    logger.debug("🔐 Authenticating Google API for sending emails")
+
     creds = None
-    token_data = os.environ.get('TOKEN_SEND_JSON')  # Loaded from Render env
+    token_data = os.environ.get('TOKEN_SEND_JSON')  # must be set in Render
 
     if not token_data:
-        logger.error("❌ TOKEN_SEND_JSON not set in environment.")
+        logger.error("❌ TOKEN_SEND_JSON not found in environment.")
         raise Exception("TOKEN_SEND_JSON is missing")
 
     try:
         creds = Credentials.from_authorized_user_info(json.loads(token_data), SCOPES)
-        logger.debug("✅ Loaded Gmail token from TOKEN_SEND_JSON")
 
+        # Automatically refresh token if expired
         if creds.expired and creds.refresh_token:
+            logger.debug("🔁 Token expired. Attempting to refresh...")
             creds.refresh(Request())
-            logger.debug("🔁 Token refreshed successfully")
+            logger.debug("✅ Token refreshed successfully")
+
     except Exception as e:
-        logger.error(f"❌ Failed to load or refresh Gmail token: {e}")
+        logger.error(f"❌ Failed to load or refresh token: {e}")
         raise Exception(f"Authentication failed: {e}")
 
     try:
         gmail_service = build('gmail', 'v1', credentials=creds)
-        logger.debug("✅ Gmail service built successfully")
+        logger.debug("✅ Gmail service initialized successfully")
         return gmail_service
     except Exception as e:
-        logger.error(f"❌ Failed to build Gmail service: {e}")
+        logger.error(f"❌ Failed to initialize Gmail service: {e}")
         raise Exception(f"Failed to build Gmail service: {e}")
+
 
 def authenticate_gmail_read(scopes, token_env_var):
     """Authenticate with Google API for read-only access and return Gmail service."""
