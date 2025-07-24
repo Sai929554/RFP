@@ -295,7 +295,6 @@ def authenticate_gmail_read(scopes, token_env_var):
     except Exception as e:
         logger.error(f"Failed to build Gmail service for read-only access: {e}")
         raise Exception(f"Failed to build Gmail service: {e}")
-
 def get_due_rfps(filter_option):
     """Fetch RFPs based on the filter option."""
     try:
@@ -309,6 +308,7 @@ def get_due_rfps(filter_option):
         
         for rfp in rfps:
             formatted_date = rfp.get('formatted_date')
+            online_link = rfp.get('online_link')  # ✅ extract the URL
             if not formatted_date or formatted_date == 'NOT AVAILABLE':
                 logger.warning(f"Skipping RFP with missing or invalid formatted_date: {rfp.get('subject', 'N/A')}")
                 print(f"⚠️ Skipping RFP with missing or invalid formatted_date: {rfp.get('subject', 'N/A')}")
@@ -327,6 +327,13 @@ def get_due_rfps(filter_option):
                 logger.warning(f"Invalid date format for RFP {rfp.get('subject', 'N/A')}: {formatted_date}, error: {e}")
                 print(f"⚠️ Invalid date format for RFP {rfp.get('subject', 'N/A')}: {formatted_date}, error: {e}")
                 continue
+
+        # Optional: validate links before sending
+        for rfp in filtered_rfps:
+            link = rfp.get('online_link')
+            if not link or link.lower() == 'link':
+                logger.warning(f"Replacing invalid link for subject: {rfp.get('subject')}")
+                rfp['online_link'] = '#'  # or leave as-is if you trust DB data
 
         if not filtered_rfps and filter_option != 'All RFPs':
             logger.info(f"No RFPs found for {filter_option}, falling back to all RFPs with valid dates")
@@ -432,6 +439,7 @@ def check_and_send_alerts():
         </tr>
 """
                         for rfp in due_rfps:
+                            print(f"📧 EMAIL RFP LINK: {rfp.get('online_link')}")
                             html_body += f"""
         <tr>
             <td>{rfp.get('subject', 'N/A')}</td>
