@@ -208,47 +208,35 @@ def authenticate_google():
     logger.debug("Attempting to authenticate Google API for sending emails")
     
     creds = None
-    token_data = os.environ.get('TOKEN_SEND_JSON')  # Load token from env
-    
+    token_data = os.environ.get('TOKEN_SEND_JSON')  # Load token from Render environment
+
     if token_data:
         try:
             creds = Credentials.from_authorized_user_info(json.loads(token_data), SCOPES)
-            logger.debug("Loaded existing token for sending emails from environment variable")
+            logger.debug("✅ Loaded Gmail token from environment variable")
         except Exception as e:
-            logger.error(f"Error reading token from env: {e}")
-            creds = None
+            logger.error(f"❌ Error loading token from TOKEN_SEND_JSON: {e}")
+            raise Exception("Invalid token in TOKEN_SEND_JSON")
 
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
+        if creds.expired and creds.refresh_token:
             try:
                 creds.refresh(Request())
-                logger.debug("Refreshed expired token for sending emails")
+                logger.debug("🔁 Token refreshed successfully")
             except Exception as e:
-                logger.error(f"Failed to refresh token: {e}")
-                creds = None
-        if not creds:
-            try:
-                logger.debug("Initiating new authentication flow for sending emails")
-                flow = InstalledAppFlow.from_client_config(
-                    json.loads(os.environ['GOOGLE_CLIENT_JSON']), SCOPES
-                )
-                creds = flow.run_console()
-                os.environ['TOKEN_SEND_JSON'] = creds.to_json()  # Save token back to env
-                logger.debug("Saved new token for sending emails into environment variable")
-            except KeyError:
-                logger.error("GOOGLE_CLIENT_JSON not set. Please add it to environment variables.")
-                raise FileNotFoundError("GOOGLE_CLIENT_JSON environment variable not found")
-            except Exception as e:
-                logger.error(f"Authentication flow failed for sending emails: {e}")
-                raise Exception(f"Authentication flow failed: {e}")
+                logger.error(f"❌ Failed to refresh Gmail token: {e}")
+                raise Exception("Failed to refresh Gmail token")
+    else:
+        logger.error("❌ TOKEN_SEND_JSON not found in environment.")
+        raise Exception("TOKEN_SEND_JSON not found in environment.")
 
     try:
         gmail_service = build('gmail', 'v1', credentials=creds)
-        logger.debug("Google API authentication successful for sending emails")
+        logger.debug("✅ Gmail API authenticated and service built successfully")
         return gmail_service
     except Exception as e:
-        logger.error(f"Failed to build Gmail service for sending emails: {e}")
+        logger.error(f"❌ Failed to build Gmail service: {e}")
         raise Exception(f"Failed to build Gmail service: {e}")
+
 def authenticate_gmail_read(scopes, token_env_var):
     """Authenticate with Google API for read-only access and return Gmail service."""
     logger.debug(f"Attempting to authenticate Google API for read-only access with token env {token_env_var}")
