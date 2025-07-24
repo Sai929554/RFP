@@ -435,7 +435,7 @@ def check_and_send_alerts():
                             html_body += f"""
         <tr>
             <td>{rfp.get('subject', 'N/A')}</td>
-            <td><a href="{rfp.get('online_link', '#')}">Link</a></td>
+            <td><a href="{rfp.get('online_link', '#')}">{rfp.get('online_link', '#')}</a></td>
             <td>{rfp.get('formatted_date', 'N/A')}</td>
             <td>{rfp.get('agency', 'N/A')}</td>
             <td>{rfp.get('reference', 'N/A')}</td>
