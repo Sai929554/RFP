@@ -216,9 +216,9 @@ def authenticate_google():
     try:
         creds = Credentials.from_authorized_user_info(json.loads(token_data), SCOPES)
 
-        # Automatically refresh token if expired
-        if creds.expired and creds.refresh_token:
-            logger.debug("🔁 Token expired. Attempting to refresh...")
+        # Refresh silently if needed
+        if creds and creds.expired and creds.refresh_token:
+            logger.debug("🔁 Token expired. Refreshing using refresh_token...")
             creds.refresh(Request())
             logger.debug("✅ Token refreshed successfully")
 
@@ -233,6 +233,7 @@ def authenticate_google():
     except Exception as e:
         logger.error(f"❌ Failed to initialize Gmail service: {e}")
         raise Exception(f"Failed to build Gmail service: {e}")
+
 
 
 def authenticate_gmail_read(scopes, token_env_var):
