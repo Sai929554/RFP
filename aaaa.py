@@ -233,9 +233,11 @@ def authenticate_google():
     except Exception as e:
         logger.error(f"❌ Failed to initialize Gmail service: {e}")
         raise Exception(f"Failed to build Gmail service: {e}")
+        
 def authenticate_gmail_read(scopes, token_env_var):
     """Authenticate with Google API for read-only access and return Gmail service."""
     logger.debug(f"🔐 Authenticating Gmail read API using env var: {token_env_var}")
+    print("🔍 ENV TOKEN_READ_JSON =", "FOUND" if os.environ.get("TOKEN_READ_JSON") else "MISSING")
 
     token_data = os.environ.get(token_env_var)
     if not token_data:
