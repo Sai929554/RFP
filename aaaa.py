@@ -51,6 +51,8 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+import json
+
 def load_environment_files():
     """Load environment variables from .env files if present, else rely on system environment variables."""
     # Load .env files only if they exist (for local development)
@@ -67,11 +69,26 @@ def load_environment_files():
         print("⚠️ credentials.env not found. Using environment variables from Render.")
 
     # Verify required environment variables
-    required_vars = ['SUPABASE_URL', 'SUPABASE_KEY', 'GOV_USERNAME', 'GOV_PASSWORD']
-    missing_vars = [var for var in required_vars if not os.environ.get(var)]
-    
-    if missing_vars:
-        error_msg = f"Missing environment variables: {', '.join(missing_vars)}"
+    required_vars = ['SUPABASE_URL', 'SUPABASE_KEY', 'GOV_USERNAME', 'GOV_PASSWORD', 'TOKEN_READ_JSON', 'TOKEN_SEND_JSON']
+    missing_vars = []
+    invalid_json_vars = []
+
+    for var in required_vars:
+        value = os.environ.get(var)
+        if not value:
+            missing_vars.append(var)
+        elif var in ['TOKEN_READ_JSON', 'TOKEN_SEND_JSON']:
+            try:
+                json.loads(value)  # Validate JSON format
+            except json.JSONDecodeError as e:
+                invalid_json_vars.append(f"{var} (Invalid JSON: {str(e)})")
+
+    if missing_vars or invalid_json_vars:
+        error_msg = ""
+        if missing_vars:
+            error_msg += f"Missing environment variables: {', '.join(missing_vars)}. "
+        if invalid_json_vars:
+            error_msg += f"Invalid JSON in environment variables: {', '.join(invalid_json_vars)}"
         logger.error(error_msg)
         print(f"❌ {error_msg}")
         raise ValueError(error_msg)
@@ -233,34 +250,37 @@ def authenticate_google():
         logger.error(f"❌ Failed to authenticate Gmail send service: {e}")
         raise Exception(f"Failed to build Gmail send service: {e}")
 
-# ✅ READ: Gmail authentication for reading emails
 def authenticate_gmail_read(scopes, token_env_var):
     """Authenticate with Google API for read-only access and return Gmail service."""
     logger.debug(f"🔐 Authenticating Gmail read API using env var: {token_env_var}")
-    token_data = os.environ.get(token_env_var)
-    print("🔍 ENV TOKEN_READ_JSON =", "FOUND" if os.environ.get("TOKEN_READ_JSON") else "MISSING")
+    print(f"🔍 ENV {token_env_var} =", "FOUND" if os.environ.get(token_env_var) else "MISSING")
 
     token_data = os.environ.get(token_env_var)
     if not token_data:
         logger.error(f"❌ {token_env_var} environment variable not found in Render")
-        raise Exception(f"{token_env_var} is missing in environment")
+        raise ValueError(f"{token_env_var} is missing in environment")
 
     try:
-        creds = Credentials.from_authorized_user_info(json.loads(token_data), scopes)
+        creds_data = json.loads(token_data)
+        creds = Credentials.from_authorized_user_info(creds_data, scopes)
 
+        # Refresh token if expired and refresh_token exists
         if creds and creds.expired and creds.refresh_token:
             logger.info(f"🔄 Token expired. Attempting refresh for {token_env_var}")
             creds.refresh(Request())
             logger.info("✅ Token refreshed successfully")
 
+        # Build and return Gmail service
         service = build('gmail', 'v1', credentials=creds)
         logger.debug("✅ Gmail read service authenticated and built")
         return service
 
+    except json.JSONDecodeError as e:
+        logger.error(f"❌ Invalid JSON format in {token_env_var}: {e}")
+        raise ValueError(f"Invalid JSON format in {token_env_var}: {e}")
     except Exception as e:
         logger.error(f"❌ Gmail read authentication failed: {e}")
         raise Exception(f"Authentication failed for Gmail read: {e}")
-
 def parse_gmail_alerts():
     # ✅ Authenticate Gmail read-only service first
     from auth import authenticate_gmail_read  # if defined in a separate file
@@ -1036,7 +1056,7 @@ def process_daily_bids(interval_minutes=None):
 
     driver = None
     try:
-        gmail_service = authenticate_gmail_read(SCOPES_GMAIL_READ, 'token_read.json')
+        gmail_service = authenticate_gmail_read(SCOPES_GMAIL_READ, 'TOKEN_READ_JSON')  # Fixed to use correct env var name
         if not gmail_service:
             print("❌ Failed to authenticate Gmail API for reading")
             logger.error("Failed to authenticate Gmail API for reading")
@@ -1151,7 +1171,6 @@ def process_daily_bids(interval_minutes=None):
             driver.quit()
             logger.info("WebDriver closed")
             print("🛑 WebDriver closed")
-
 def run_process_daily_bids_in_background(interval_minutes=None):
     """Run process_daily_bids in a background thread."""
     def target():
