@@ -213,22 +213,22 @@ def retry_on_transient_error(max_attempts=3, backoff_factor=2):
     return decorator
 import json
 import os
+import logging
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
+import base64
+from datetime import datetime
 
-# ✅ Define scopes
-SCOPES = ['https://www.googleapis.com/auth/gmail.send']
-SCOPES_GMAIL_READ = ['https://www.googleapis.com/auth/gmail.readonly']
+logger = logging.getLogger(__name__)
 
-# ✅ SEND: Gmail authentication for sending emails
 def authenticate_google():
     """Authenticate with Google API and return Gmail service for sending emails."""
     global gmail_service
     logger.debug("🔐 Authenticating Google API for sending emails")
 
-    token_data = os.environ.get('TOKEN_SEND_JSON')
-    print("🔍 ENV TOKEN_SEND_JSON =", "FOUND" if token_data else "MISSING")
+    creds = None
+    token_data = os.environ.get('TOKEN_SEND_JSON')  # must be set in Render
 
     if not token_data:
         logger.error("❌ TOKEN_SEND_JSON not found in environment.")
@@ -237,32 +237,37 @@ def authenticate_google():
     try:
         creds = Credentials.from_authorized_user_info(json.loads(token_data), SCOPES)
 
+        # Refresh silently if needed
         if creds and creds.expired and creds.refresh_token:
             logger.debug("🔁 Token expired. Refreshing using refresh_token...")
             creds.refresh(Request())
             logger.debug("✅ Token refreshed successfully")
 
-        gmail_service = build('gmail', 'v1', credentials=creds)
-        logger.debug("✅ Gmail send service initialized successfully")
-        return gmail_service
-
     except Exception as e:
-        logger.error(f"❌ Failed to authenticate Gmail send service: {e}")
-        raise Exception(f"Failed to build Gmail send service: {e}")
+        logger.error(f"❌ Failed to load or refresh token: {e}")
+        raise Exception(f"Authentication failed: {e}")
+
+    try:
+        gmail_service = build('gmail', 'v1', credentials=creds)
+        logger.debug("✅ Gmail service initialized successfully")
+        return gmail_service
+    except Exception as e:
+        logger.error(f"❌ Failed to initialize Gmail service: {e}")
+        raise Exception(f"Failed to build Gmail service: {e}")
 
 def authenticate_gmail_read(scopes, token_env_var):
     """Authenticate with Google API for read-only access and return Gmail service."""
     logger.debug(f"🔐 Authenticating Gmail read API using env var: {token_env_var}")
-    print(f"🔍 ENV {token_env_var} =", "FOUND" if os.environ.get(token_env_var) else "MISSING")
+    print(f"🔍 ENV {token_env_var} = {'FOUND' if os.environ.get(token_env_var) else 'MISSING'}")
 
     token_data = os.environ.get(token_env_var)
     if not token_data:
         logger.error(f"❌ {token_env_var} environment variable not found in Render")
-        raise ValueError(f"{token_env_var} is missing in environment")
+        raise Exception(f"{token_env_var} is missing in environment")
 
     try:
-        creds_data = json.loads(token_data)
-        creds = Credentials.from_authorized_user_info(creds_data, scopes)
+        token_info = json.loads(token_data)
+        creds = Credentials.from_authorized_user_info(token_info, scopes)
 
         # Refresh token if expired and refresh_token exists
         if creds and creds.expired and creds.refresh_token:
@@ -275,38 +280,51 @@ def authenticate_gmail_read(scopes, token_env_var):
         logger.debug("✅ Gmail read service authenticated and built")
         return service
 
-    except json.JSONDecodeError as e:
-        logger.error(f"❌ Invalid JSON format in {token_env_var}: {e}")
-        raise ValueError(f"Invalid JSON format in {token_env_var}: {e}")
     except Exception as e:
         logger.error(f"❌ Gmail read authentication failed: {e}")
         raise Exception(f"Authentication failed for Gmail read: {e}")
-def parse_gmail_alerts():
-    # ✅ Authenticate Gmail read-only service first
-    from auth import authenticate_gmail_read  # if defined in a separate file
-    gmail_read_service = authenticate_gmail_read(SCOPES_GMAIL_READ, 'TOKEN_READ_JSON')  # Only here
-    messages = gmail_read_service.users().messages().list(userId='me', q='subject:RFP').execute()
-    # ✅ Now you can use `gmail_read_service` to access Gmail
-    try:
-        results = gmail_read_service.users().messages().list(userId='me', q='subject:RFP').execute()
-        messages = results.get('messages', [])
-        print(f"✅ Retrieved {len(messages)} messages with subject:RFP")
-        
-        # Proceed with parsing each message if needed
-        for msg in messages:
-            msg_id = msg['id']
-            full_msg = gmail_read_service.users().messages().get(userId='me', id=msg_id, format='full').execute()
-            snippet = full_msg.get('snippet', '')
-            print(f"🔍 Snippet: {snippet}")
 
-        return messages
+def parse_gmail_alerts():
+    """Parse Gmail alerts."""
+    try:
+        logger.info("🔍 Starting Gmail alerts parsing...")
+
+        gmail_read_service = authenticate_gmail_read(SCOPES_GMAIL_READ, 'TOKEN_READ_JSON')
+
+        query = 'subject:RFP'
+        logger.info(f"📧 Searching for emails with query: {query}")
+
+        results = gmail_read_service.users().messages().list(userId='me', q=query, maxResults=50).execute()
+        messages = results.get('messages', [])
+
+        logger.info(f"✅ Retrieved {len(messages)} messages with subject:RFP")
+        print(f"✅ Retrieved {len(messages)} messages with subject:RFP")
+
+        processed_messages = []
+        for i, msg in enumerate(messages[:10], 1):
+            try:
+                msg_id = msg['id']
+                full_msg = gmail_read_service.users().messages().get(userId='me', id=msg_id, format='full').execute()
+                snippet = full_msg.get('snippet', '')
+
+                logger.debug(f"📧 Message {i}: {snippet[:100]}...")
+                print(f"🔍 Message {i} snippet: {snippet[:100]}...")
+
+                processed_messages.append({
+                    'id': msg_id,
+                    'snippet': snippet
+                })
+
+            except Exception as msg_error:
+                logger.warning(f"⚠️ Failed to process message {i}: {msg_error}")
+                continue
+
+        logger.info(f"✅ Successfully processed {len(processed_messages)} messages")
+        return processed_messages
 
     except Exception as e:
         logger.error(f"❌ Failed to parse Gmail alerts: {e}")
-        raise Exception(f"Failed to parse Gmail alerts: {e}")
-
-
-
+        print(f"❌ Failed to parse Gmail alerts: {e}")
 def get_due_rfps(filter_option):
     """Fetch RFPs based on the filter option."""
     try:
