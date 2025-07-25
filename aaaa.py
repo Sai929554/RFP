@@ -238,9 +238,9 @@ def authenticate_gmail_read(scopes, token_env_var):
     """Authenticate with Google API for read-only access and return Gmail service."""
     logger.debug(f"🔐 Authenticating Gmail read API using env var: {token_env_var}")
     token_data = os.environ.get(token_env_var)
+    print("🔍 ENV TOKEN_READ_JSON =", "FOUND" if os.environ.get("TOKEN_READ_JSON") else "MISSING")
 
-    print(f"🔍 ENV {token_env_var} =", "FOUND" if token_data else "MISSING")
-
+    token_data = os.environ.get(token_env_var)
     if not token_data:
         logger.error(f"❌ {token_env_var} environment variable not found in Render")
         raise Exception(f"{token_env_var} is missing in environment")
