@@ -259,6 +259,29 @@ def authenticate_gmail_read(scopes, token_env_var):
     except Exception as e:
         logger.error(f"❌ Gmail read authentication failed: {e}")
         raise Exception(f"Authentication failed for Gmail read: {e}")
+def parse_gmail_alerts():
+    # ✅ Authenticate Gmail read-only service first
+    from auth import authenticate_gmail_read  # if defined in a separate file
+    gmail_read_service = authenticate_gmail_read(SCOPES_GMAIL_READ, 'TOKEN_READ_JSON')
+
+    # ✅ Now you can use `gmail_read_service` to access Gmail
+    try:
+        results = gmail_read_service.users().messages().list(userId='me', q='subject:RFP').execute()
+        messages = results.get('messages', [])
+        print(f"✅ Retrieved {len(messages)} messages with subject:RFP")
+        
+        # Proceed with parsing each message if needed
+        for msg in messages:
+            msg_id = msg['id']
+            full_msg = gmail_read_service.users().messages().get(userId='me', id=msg_id, format='full').execute()
+            snippet = full_msg.get('snippet', '')
+            print(f"🔍 Snippet: {snippet}")
+
+        return messages
+
+    except Exception as e:
+        logger.error(f"❌ Failed to parse Gmail alerts: {e}")
+        raise Exception(f"Failed to parse Gmail alerts: {e}")
 
 
 
