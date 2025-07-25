@@ -194,20 +194,24 @@ def retry_on_transient_error(max_attempts=3, backoff_factor=2):
             return func(*args, **kwargs)
         return wrapper
     return decorator
-
 import json
 import os
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 
+# ✅ Define scopes
+SCOPES = ['https://www.googleapis.com/auth/gmail.send']
+SCOPES_GMAIL_READ = ['https://www.googleapis.com/auth/gmail.readonly']
+
+# ✅ SEND: Gmail authentication for sending emails
 def authenticate_google():
     """Authenticate with Google API and return Gmail service for sending emails."""
     global gmail_service
     logger.debug("🔐 Authenticating Google API for sending emails")
 
-    creds = None
-    token_data = os.environ.get('TOKEN_SEND_JSON')  # must be set in Render
+    token_data = os.environ.get('TOKEN_SEND_JSON')
+    print("🔍 ENV TOKEN_SEND_JSON =", "FOUND" if token_data else "MISSING")
 
     if not token_data:
         logger.error("❌ TOKEN_SEND_JSON not found in environment.")
@@ -216,30 +220,27 @@ def authenticate_google():
     try:
         creds = Credentials.from_authorized_user_info(json.loads(token_data), SCOPES)
 
-        # Refresh silently if needed
         if creds and creds.expired and creds.refresh_token:
             logger.debug("🔁 Token expired. Refreshing using refresh_token...")
             creds.refresh(Request())
             logger.debug("✅ Token refreshed successfully")
 
-    except Exception as e:
-        logger.error(f"❌ Failed to load or refresh token: {e}")
-        raise Exception(f"Authentication failed: {e}")
-
-    try:
         gmail_service = build('gmail', 'v1', credentials=creds)
-        logger.debug("✅ Gmail service initialized successfully")
+        logger.debug("✅ Gmail send service initialized successfully")
         return gmail_service
+
     except Exception as e:
-        logger.error(f"❌ Failed to initialize Gmail service: {e}")
-        raise Exception(f"Failed to build Gmail service: {e}")
-        
+        logger.error(f"❌ Failed to authenticate Gmail send service: {e}")
+        raise Exception(f"Failed to build Gmail send service: {e}")
+
+# ✅ READ: Gmail authentication for reading emails
 def authenticate_gmail_read(scopes, token_env_var):
     """Authenticate with Google API for read-only access and return Gmail service."""
     logger.debug(f"🔐 Authenticating Gmail read API using env var: {token_env_var}")
-    print("🔍 ENV TOKEN_READ_JSON =", "FOUND" if os.environ.get("TOKEN_READ_JSON") else "MISSING")
-
     token_data = os.environ.get(token_env_var)
+
+    print(f"🔍 ENV {token_env_var} =", "FOUND" if token_data else "MISSING")
+
     if not token_data:
         logger.error(f"❌ {token_env_var} environment variable not found in Render")
         raise Exception(f"{token_env_var} is missing in environment")
@@ -247,13 +248,11 @@ def authenticate_gmail_read(scopes, token_env_var):
     try:
         creds = Credentials.from_authorized_user_info(json.loads(token_data), scopes)
 
-        # Refresh token if expired and refresh_token exists
         if creds and creds.expired and creds.refresh_token:
             logger.info(f"🔄 Token expired. Attempting refresh for {token_env_var}")
             creds.refresh(Request())
             logger.info("✅ Token refreshed successfully")
 
-        # Build and return Gmail service
         service = build('gmail', 'v1', credentials=creds)
         logger.debug("✅ Gmail read service authenticated and built")
         return service
@@ -261,11 +260,12 @@ def authenticate_gmail_read(scopes, token_env_var):
     except Exception as e:
         logger.error(f"❌ Gmail read authentication failed: {e}")
         raise Exception(f"Authentication failed for Gmail read: {e}")
+
 def parse_gmail_alerts():
     # ✅ Authenticate Gmail read-only service first
     from auth import authenticate_gmail_read  # if defined in a separate file
-    gmail_read_service = authenticate_gmail_read(SCOPES_GMAIL_READ, 'TOKEN_READ_JSON')
-
+    gmail_read_service = authenticate_gmail_read(SCOPES_GMAIL_READ, 'TOKEN_READ_JSON')  # Only here
+    messages = gmail_read_service.users().messages().list(userId='me', q='subject:RFP').execute()
     # ✅ Now you can use `gmail_read_service` to access Gmail
     try:
         results = gmail_read_service.users().messages().list(userId='me', q='subject:RFP').execute()
@@ -342,6 +342,7 @@ def get_due_rfps(filter_option):
 
 def send_email(recipient, subject, html_body):
     """Send an email using Gmail API."""
+    gmail_send_service = authenticate_google()
     message = MIMEText(html_body, 'html')
     message['to'] = recipient
     message['from'] = "rfp@iitlabs.com"
