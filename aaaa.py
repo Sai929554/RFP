@@ -233,31 +233,33 @@ def authenticate_google():
     except Exception as e:
         logger.error(f"❌ Failed to initialize Gmail service: {e}")
         raise Exception(f"Failed to build Gmail service: {e}")
-
 def authenticate_gmail_read(scopes, token_env_var):
     """Authenticate with Google API for read-only access and return Gmail service."""
-    logger.debug(f"🔐 Authenticating Gmail read API using {token_env_var}")
-    
+    logger.debug(f"🔐 Authenticating Gmail read API using env var: {token_env_var}")
+
     token_data = os.environ.get(token_env_var)
     if not token_data:
-        logger.error(f"❌ {token_env_var} environment variable not found")
+        logger.error(f"❌ {token_env_var} environment variable not found in Render")
         raise Exception(f"{token_env_var} is missing in environment")
 
     try:
         creds = Credentials.from_authorized_user_info(json.loads(token_data), scopes)
 
-        if creds.expired and creds.refresh_token:
-            logger.info(f"🔄 Token expired. Attempting silent refresh for {token_env_var}...")
+        # Refresh token if expired and refresh_token exists
+        if creds and creds.expired and creds.refresh_token:
+            logger.info(f"🔄 Token expired. Attempting refresh for {token_env_var}")
             creds.refresh(Request())
-            logger.info("✅ Token refreshed")
+            logger.info("✅ Token refreshed successfully")
 
+        # Build and return Gmail service
         service = build('gmail', 'v1', credentials=creds)
-        logger.debug("✅ Gmail read service initialized successfully")
+        logger.debug("✅ Gmail read service authenticated and built")
         return service
 
     except Exception as e:
-        logger.error(f"❌ Failed to authenticate Gmail read: {e}")
+        logger.error(f"❌ Gmail read authentication failed: {e}")
         raise Exception(f"Authentication failed for Gmail read: {e}")
+
 
 
 def get_due_rfps(filter_option):
